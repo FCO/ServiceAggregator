@@ -41,8 +41,13 @@ class Flux {
 	has Dependable	%!dependables;
 	has				%.data;
 
-	method new($input) {
-		::?CLASS.bless: :data({input => $input})
+	method input($input) {
+		%!data<input> = $input;
+		my $p = Promise.new;
+		%!dependables.pairs.map: -> (:$key, :$value) {
+			%!data{$key} = start { await $p; $value.run($(%!data)) };
+		}
+		$p.keep;
 	}
 
 	method add-dependable(Str $name, Dependable $obj) {
@@ -50,9 +55,6 @@ class Flux {
 	}
 
 	method get-data {
-		%!dependables.pairs.map: -> (:$key, :$value) {
-			%!data{$key} = start { $value.run($(%!data)) };
-		}
 		%!data
 	}
 
