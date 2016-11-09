@@ -37,32 +37,6 @@ class Service {
 	}
 }
 
-class Flux {
-	has Dependable	%!dependables;
-	has				%.data;
-
-	method input($input) {
-		%!data<input> = $input;
-		my $p = Promise.new;
-		%!dependables.pairs.map: -> (:$key, :$value) {
-			%!data{$key} = start { await $p; $value.run($(%!data)) };
-		}
-		$p.keep;
-	}
-
-	method add-dependable(Str $name, Dependable $obj) {
-		%!dependables{$name} = $obj
-	}
-
-	method get-data {
-		%!data
-	}
-
-	method get-output(Str $name) {
-		from-json await $.get-data{$name}
-	}
-}
-
 class Transformation does Dependable {
 	has Str $.template;
 
@@ -77,9 +51,9 @@ class Transformation does Dependable {
 
 class Request does Dependable {
 	has Service	$.service is required;
-	has Str		$.path					= '/';
-	has	Str		$.tmpl-headers			= '{}';
-	has Str		$.tmpl-body				= '';
+	has Str		$.tmpl-path		= '/';
+	has	Str		$.tmpl-headers	= '{}';
+	has Str		$.tmpl-body		= '';
 
 	method run($data) {
 		my $p-header	= start { from-json Template::Mustache.render($!tmpl-headers,	$data) };
@@ -90,5 +64,55 @@ class Request does Dependable {
 			:$header,
 			:$body,
 		}
+	}
+}
+
+class EndPoint {
+	use YAMLish;
+	has Str			$.path;
+	has Dependable	%!dependables;
+	has				%!data;
+
+	method new(Str $file where *.IO.f) {
+		my $conf = load-yaml($file.IO.slurp);
+		my $obj = EndPoint.bless(:path($conf<path>));
+		for $conf<requests>.kv -> $name, $data {
+			#TODO: Service
+			my Request $req .= new: :service(Service.new), :tmpl-body($data<body> // ""), :tmpl-header($data<header> // ""), :tmpl-path($data<path> // "");
+			$obj.add-dependable: $name, $req;
+		}
+		$obj.add-output: Transformation.new: $conf<output>;
+		$obj
+	}
+
+	method input($input) {
+		%!data<input> = $input;
+		my $p = Promise.new;
+		%!dependables.pairs.map: -> (:$key, :$value) {
+			%!data{$key} = start { await $p; $value.run($(%!data)) };
+		}
+		$p.keep;
+	}
+
+	method add-output(Dependable $obj) {
+		%!dependables<__output__> = $obj
+	}
+
+	method add-dependable(Str $name, Dependable $obj) {
+		%!dependables{$name} = $obj
+	}
+
+	method get-output() {
+		from-json await %!data<__output__>
+	}
+
+	method run(:$header, :$body, :$url) {
+		%!data = ();
+		$.input({
+			:$header,
+			:$body,
+			:$url,
+		});
+		$.get-output
 	}
 }

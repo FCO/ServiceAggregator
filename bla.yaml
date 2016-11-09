@@ -1,0 +1,9 @@
+---
+name      : Bla
+path      : /bla
+requests  :
+  acc:
+    service : acc
+    header  : '{"content-type": "application/json"}'
+    body    : '{ "input": {{ input.body }} }'
+output: '{ acc: {{acc.body.input}} }'

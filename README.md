@@ -5,20 +5,14 @@ perl6 -Ilib -MRequest -e'
 
 my $service = Service.new-load-balance("localhost", 8080);
 
-my $f = Flux.new;
-$f.add-dependable: "acc",    Request.new(:$service, :tmpl-body(q"{input: {{input.body}} }"));
-$f.add-dependable: "output", Transformation.new: q"{ acc: {{acc.body.input}} }";
-
-$f.input: {body => 42};
+my $e = EndPoint.new: "bla.yaml";
 
 
-
-
-say $f.get-output("output");
-
+say $e.run: :body(42);
+say $e.run: :body(55);
 
 
 '
-{acc => 42}'
-
+{acc => 42}
+{acc => 55}
 ```
