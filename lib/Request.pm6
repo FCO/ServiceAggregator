@@ -16,6 +16,10 @@ class Service {
 
 	has Instance @!instances;
 
+	method get {
+		@!instances.pick
+	}
+
 	multi method new-instance(::?CLASS:U: $host, $port) {
 		state $obj = ::?CLASS.new;
 		$obj.new-instance: $host, $port;
@@ -67,18 +71,29 @@ class Request does Dependable {
 	}
 }
 
+class Server{...}
+
 class EndPoint {
 	use YAMLish;
+	has Str			$.name;
 	has Str			$.path;
 	has Dependable	%!dependables;
 	has				%!data;
+	has Promise		@!promises;
+	has Server		$.server;
 
-	method new(Str $file where *.IO.f) {
+	method new(Str $file where *.IO.f, Server :$server) {
 		my $conf = load-yaml($file.IO.slurp);
-		my $obj = EndPoint.bless(:path($conf<path>));
+		my $obj = EndPoint.bless(:name($conf<name>), :path($conf<path>), :$server);
 		for $conf<requests>.kv -> $name, $data {
+			my %pars;
+			for <body header path> -> $key {
+				if $data{$key}:exists {
+					%pars{"tmpl-$key"} = $data{$key}
+				}
+			}
 			#TODO: Service
-			my Request $req .= new: :service(Service.new), :tmpl-body($data<body> // ""), :tmpl-header($data<header> // ""), :tmpl-path($data<path> // "");
+			my Request $req .= new: :service($obj.server.get-service($data<service>)), |%pars;
 			$obj.add-dependable: $name, $req;
 		}
 		$obj.add-output: Transformation.new: $conf<output>;
@@ -86,12 +101,14 @@ class EndPoint {
 	}
 
 	method input($input) {
-		%!data<input> = $input;
+		my %data;
+		%data<input> = $input;
 		my $p = Promise.new;
-		%!dependables.pairs.map: -> (:$key, :$value) {
-			%!data{$key} = start { await $p; $value.run($(%!data)) };
+		for %!dependables.kv -> $key, $value {
+			%data{$key} = start { await $p; $value.run($(%data)) };
 		}
 		$p.keep;
+		|%data
 	}
 
 	method add-output(Dependable $obj) {
@@ -102,17 +119,65 @@ class EndPoint {
 		%!dependables{$name} = $obj
 	}
 
-	method get-output() {
-		from-json await %!data<__output__>
+	method get-output(%data) {
+		from-json await %data<__output__>
 	}
 
 	method run(:$header, :$body, :$url) {
-		%!data = ();
-		$.input({
-			:$header,
-			:$body,
-			:$url,
-		});
-		$.get-output
+		@!promises.push: my $ret = start {
+			my %data = $.input({
+				:$header,
+				:$body,
+				:$url,
+			});
+			$.get-output(%data)
+		}
+		$ret
+	}
+
+	method wait-resolve {
+		|await @!promises
+	}
+}
+
+class Server {
+	has Service		%!services;
+	has EndPoint	%!end-points;
+
+	method new-instance(Str $name, $host, $port) {
+		if %!services{$name}:exists {
+			%!services{$name}.new-instance: $host, $port;
+		} else {
+			%!services{$name} = Service.new-instance: $host, $port;
+		}
+	}
+
+	method new-load-balance(Str $name, $host, $port) {
+		if %!services{$name}:exists {
+			%!services{$name}.new-instance: $host, $port;
+		} else {
+			%!services{$name} = Service.new-instance: $host, $port;
+		}
+	}
+
+	method get-service(Str $name) {
+		%!services{$name}
+	}
+
+	method add-end-point(Str $file where *.IO.f) {
+		my $obj = EndPoint.new: $file, :server(self);
+		%!end-points{$obj.name} = $obj
+	}
+
+	method list-services {
+		%!services.keys
+	}
+
+	method list-end-points {
+		%!end-points.keys
+	}
+
+	method get-end-point(Str $name) {
+		%!end-points{$name}
 	}
 }
