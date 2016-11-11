@@ -146,7 +146,13 @@ class Server {
 	has 			$!router		= Path::Map.new;
 
 	method lookup(Str $path) {
-		$!router.lookup($path).handler
+		$!router.lookup($path)
+	}
+
+	method run(Str :$path, :$header, :$body) {
+		my $match	= $.lookup($path);
+		my %vars	= $match.variables;
+		$match.handler.run(:path(%vars), :$header, :$body)
 	}
 
 	method new-instance(Str $name, $host, $port) {
