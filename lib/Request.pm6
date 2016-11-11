@@ -92,7 +92,6 @@ class EndPoint {
 					%pars{"tmpl-$key"} = $data{$key}
 				}
 			}
-			#TODO: Service
 			my Request $req .= new: :service($obj.server.get-service($data<service>)), |%pars;
 			$obj.add-dependable: $name, $req;
 		}
@@ -141,8 +140,14 @@ class EndPoint {
 }
 
 class Server {
+	use Path::Map;
 	has Service		%!services;
 	has EndPoint	%!end-points;
+	has 			$!router		= Path::Map.new;
+
+	method lookup(Str $path) {
+		$!router.lookup($path).handler
+	}
 
 	method new-instance(Str $name, $host, $port) {
 		if %!services{$name}:exists {
@@ -166,7 +171,8 @@ class Server {
 
 	method add-end-point(Str $file where *.IO.f) {
 		my $obj = EndPoint.new: $file, :server(self);
-		%!end-points{$obj.name} = $obj
+		%!end-points{$obj.name} = $obj;
+		$!router.add_handler: $obj.path, $obj
 	}
 
 	method list-services {
