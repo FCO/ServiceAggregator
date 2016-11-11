@@ -73,6 +73,11 @@ class Request does Dependable {
 
 class Server{...}
 
+class HardCodedEndPoint {
+	has $.data;
+	method run(|) {start {$!data}}
+}
+
 class EndPoint {
 	use YAMLish;
 	has Str			$.name;
@@ -122,12 +127,12 @@ class EndPoint {
 		from-json await %data<__output__>
 	}
 
-	method run(:$header, :$body, :$url) {
+	method run(:$header, :$body, :$path) {
 		@!promises.push: my $ret = start {
 			my %data = $.input({
 				:$header,
 				:$body,
-				:$url,
+				:$path,
 			});
 			$.get-output(%data)
 		}
@@ -141,9 +146,10 @@ class EndPoint {
 
 class Server {
 	use Path::Map;
-	has Service		%!services;
-	has EndPoint	%!end-points;
-	has 			$!router		= Path::Map.new;
+	has Service				%!services;
+	has EndPoint			%!end-points;
+	has 					$!router		= Path::Map.new;
+	has HardCodedEndPoint	$!not-found		.= new: data => {"code" => 404, "body" => "Not found", "header" => {}};
 
 	method lookup(Str $path) {
 		$!router.lookup($path)
@@ -151,8 +157,15 @@ class Server {
 
 	method run(Str :$path, :$header, :$body) {
 		my $match	= $.lookup($path);
-		my %vars	= $match.variables;
-		$match.handler.run(:path(%vars), :$header, :$body)
+		my $to-run;
+		my %vars;
+		with $match {
+			%vars	= $match.variables;
+			$to-run = $match.handler
+		} else {
+			$to-run = $!not-found
+		}
+		$to-run.run(:path(%vars), :$header, :$body)
 	}
 
 	method new-instance(Str $name, $host, $port) {
