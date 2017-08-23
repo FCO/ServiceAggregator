@@ -24,7 +24,7 @@ method run(Str :$path, :$header, :$body) {
 		$to-run = $!not-found
 	}
 	my \ret = $to-run.run(:path(%vars), :$header, :$body);
-	say "ret: ", ret;
+	say "ret1: ", ret;
 	ret
 }
 

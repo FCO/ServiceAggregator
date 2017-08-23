@@ -39,7 +39,7 @@ class EndPoint {
 			%data{$key} = start {
 				await $p;
 				my \ret = $value.run($(%data));
-				note "ret: ", ret;
+				note "ret2: ", ret;
 				ret
 			}
 		}
