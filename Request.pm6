@@ -1,4 +1,3 @@
-use SixPM;
 use JSON::Pretty;
 use HTTP::Client;
 class AsyncRequest {
