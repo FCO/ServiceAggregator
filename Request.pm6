@@ -1,12 +1,14 @@
 use SixPM;
 use JSON::Pretty;
+use HTTP::Client;
 class AsyncRequest {
-	has 		$.method = "GET";
-	has 		$.url;
-	has Pair	@.headers;
-	has			$.body;
-	has			$.json;
-	has Promise	$!prom;
+	has HTTP::Client	$.ua .= new;
+	has 				$.method = "GET";
+	has 				$.url;
+	has Pair			@.headers;
+	has					$.body;
+	has					$.json;
+	has Promise			$!prom;
 
 	method TWEAK {
 		with $!json {
@@ -14,22 +16,33 @@ class AsyncRequest {
 		}
 	}
 
+	multi method req {
+		given $!method {
+			when "GET" {
+				$!ua.get($!url)
+			}
+			when "POST" {
+				$!ua.post($!url, :data($!json))
+			}
+		}
+	}
+
 	method run {
 		without $!prom {
-			# TODO: Do the request
-			sleep 5; # just testing
 			$!prom = start {
+				my $ans = $.req;
 				{
-					input	=> {
+					request => {
 						:$!method,
 						:$!url,
 						:@!headers,
 						:$!body,
 					},
-					output	=> {
-						headers	=> [],
-						body	=> "str",
-						json	=> {type => "json"}
+					response => {
+						status	=> $ans.status,
+						headers	=> $ans.headers,
+						body	=> $ans.content,
+						json	=> try from-json $ans.content
 					}
 				}
 			}
