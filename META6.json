@@ -4,7 +4,8 @@
   "build-depends": [
     "Template::Mustache",
     "YAMLish",
-    "Path::Map"
+    "Path::Map",
+    "JSON::Pretty"
   ],
   "scripts": {
     "test": "zef test ."
@@ -12,13 +13,15 @@
   "depends": [
     "Template::Mustache",
     "YAMLish",
-    "Path::Map"
+    "Path::Map",
+    "JSON::Pretty"
   ],
   "license": "https://opensource.org/licenses/Artistic-2.0",
   "test-depends": [
     "Template::Mustache",
     "YAMLish",
-    "Path::Map"
+    "Path::Map",
+    "JSON::Pretty"
   ],
   "production": false,
   "version": "0.0.1",
