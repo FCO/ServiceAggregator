@@ -2,7 +2,7 @@
 grammar Request::Path {
     token TOP               { <root> <child-list>   }
 
-    token child-list        { <child>+              }
+    token child-list        { <child>*              }
 
     proto token child       { *                     }
     token child:sym<sw>     { <sep> <word>          }
